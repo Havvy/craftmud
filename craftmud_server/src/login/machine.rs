@@ -44,44 +44,6 @@ pub(super) trait State: std::fmt::Debug + Sized + Into<Machine> {
     fn previous(self) -> Self::Previous;
 }
 
-/// A 'dynamic' version of the State trait, which is applicable for both
-/// individual states and aggregates of states (e.g. Machine).
-pub(super) trait DynState {
-    /// What to output to the player when transitioning to this state.
-    fn preamble(&self) -> Option<&'static str>;
-
-    /// Whether or not the current state is waiting on a database response.
-    /// 
-    /// Implicitly, if this is false, then it is waiting on player input.
-    fn waiting_on_db(&self) -> bool;
-
-    /// This function handles player input. It's behavior varies heavily
-    /// depending on the indivudual state.
-    fn handle_input(self, input: String, db: &Database) -> HandledBy;
-
-    /// This function handles database input. It'll do nothing when there's
-    /// no response, and otherwise its behavior depends heavily on the individual state.
-    fn handle_db_response(self) -> HandledBy;
-}
-
-impl<S: State> DynState for S {
-    fn preamble(&self) -> Option<&'static str> {
-        Self::PREAMBLE
-    }
-
-    fn waiting_on_db(&self) -> bool {
-        Self::WAITING_ON_DB
-    }
-
-    fn handle_input(self, input: String, db: &Database) -> HandledBy {
-        <Self as State>::handle_input(self, input, db)
-    }
-
-    fn handle_db_response(self) -> HandledBy {
-        <Self as State>::handle_db_response(self)
-    }
-}
-
 #[derive(Debug)]
 pub(super) struct JustConnected;
 
@@ -249,24 +211,6 @@ impl State for LoginRequestPassword {
 #[derive(Debug)]
 pub(super) struct Terminal;
 
-impl DynState for Terminal {
-    fn preamble(&self) -> Option<&'static str> {
-        panic!("Methods should not be called on terminal login state!");
-    }
-
-    fn waiting_on_db(&self) -> bool {
-        panic!("Methods should not be called on terminal login state!");
-    }
-
-    fn handle_input(self, _input: String, _db: &Database) -> HandledBy {
-        panic!("Methods should not be called on terminal login state!");
-    }
-
-    fn handle_db_response(self) -> HandledBy {
-        panic!("Methods should not be called on terminal login state!");
-    }
-}
-
 // Following https://hoverbear.org/blog/rust-state-machine-pattern/
 /// The state of a user when they first connect and try to log in or register.
 #[derive(Debug, DeriveFrom)]
@@ -299,53 +243,52 @@ impl Default for Machine {
     }
 }
 
-// All the boilerplate...
-impl DynState for Machine {
-    fn preamble(&self) -> Option<&'static str> {
+impl Machine {
+    pub fn preamble(&self) -> Option<&'static str> {
         match self {
-            Machine::JustConnected(state) => state.preamble(),
-            Machine::RegisterRequestName(state) => state.preamble(),
-            Machine::RegisterReqEmail(state) => state.preamble(),
-            Machine::RegisterCheckNameEmailUnique(state) => state.preamble(),
-            Machine::RegisterRequestPassword(state) => state.preamble(),
-            Machine::LoginRequestPassword(state) => state.preamble(),
-            Machine::Terminal(state) => state.preamble(),
+            Machine::JustConnected(_state) => JustConnected::PREAMBLE,
+            Machine::RegisterRequestName(_state) => RegisterRequestName::PREAMBLE,
+            Machine::RegisterReqEmail(state) => RegisterRequestEmail::PREAMBLE,
+            Machine::RegisterCheckNameEmailUnique(state) => RegisterCheckNameEmailUnique::PREAMBLE,
+            Machine::RegisterRequestPassword(state) => RegisterRequestPassword::PREAMBLE,
+            Machine::LoginRequestPassword(state) => LoginRequestPassword::PREAMBLE,
+            Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
     }
 
-    fn waiting_on_db(&self) -> bool {
+    pub fn waiting_on_db(&self) -> bool {
         match self {
-            Machine::JustConnected(state) => state.waiting_on_db(),
-            Machine::RegisterRequestName(state) => state.waiting_on_db(),
-            Machine::RegisterReqEmail(state) => state.waiting_on_db(),
-            Machine::RegisterCheckNameEmailUnique(state) => state.waiting_on_db(),
-            Machine::RegisterRequestPassword(state) => state.waiting_on_db(),
-            Machine::LoginRequestPassword(state) => state.waiting_on_db(),
-            Machine::Terminal(state) => state.waiting_on_db(),
+            Machine::JustConnected(_state) => JustConnected::WAITING_ON_DB,
+            Machine::RegisterRequestName(_state) => RegisterRequestName::WAITING_ON_DB,
+            Machine::RegisterReqEmail(state) => RegisterRequestEmail::WAITING_ON_DB,
+            Machine::RegisterCheckNameEmailUnique(state) => RegisterCheckNameEmailUnique::WAITING_ON_DB,
+            Machine::RegisterRequestPassword(state) => RegisterRequestPassword::WAITING_ON_DB,
+            Machine::LoginRequestPassword(state) => LoginRequestPassword::WAITING_ON_DB,
+            Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
     }
 
-    fn handle_input(self, input: String, db: &Database) -> HandledBy {
+    pub fn handle_input(self, input: String, db: &Database) -> HandledBy {
         match self {
-            Machine::JustConnected(state) => DynState::handle_input(state, input, db),
-            Machine::RegisterRequestName(state) => DynState::handle_input(state, input, db),
-            Machine::RegisterReqEmail(state) => DynState::handle_input(state, input, db),
-            Machine::RegisterCheckNameEmailUnique(state) => DynState::handle_input(state, input, db),
-            Machine::RegisterRequestPassword(state) => DynState::handle_input(state, input, db),
-            Machine::LoginRequestPassword(state) => DynState::handle_input(state, input, db),
-            Machine::Terminal(state) => DynState::handle_input(state, input, db),
+            Machine::JustConnected(state) => State::handle_input(state, input, db),
+            Machine::RegisterRequestName(state) => State::handle_input(state, input, db),
+            Machine::RegisterReqEmail(state) => State::handle_input(state, input, db),
+            Machine::RegisterCheckNameEmailUnique(state) => State::handle_input(state, input, db),
+            Machine::RegisterRequestPassword(state) => State::handle_input(state, input, db),
+            Machine::LoginRequestPassword(state) => State::handle_input(state, input, db),
+            Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
     }
 
-    fn handle_db_response(self) -> HandledBy {
+    pub fn handle_db_response(self) -> HandledBy {
         match self {
-            Machine::JustConnected(state) => DynState::handle_db_response(state),
-            Machine::RegisterRequestName(state) => DynState::handle_db_response(state),
-            Machine::RegisterReqEmail(state) => DynState::handle_db_response(state),
-            Machine::RegisterCheckNameEmailUnique(state) => DynState::handle_db_response(state),
-            Machine::RegisterRequestPassword(state) => DynState::handle_db_response(state),
-            Machine::LoginRequestPassword(state) => DynState::handle_db_response(state),
-            Machine::Terminal(state) => DynState::handle_db_response(state),
+            Machine::JustConnected(state) => State::handle_db_response(state),
+            Machine::RegisterRequestName(state) => State::handle_db_response(state),
+            Machine::RegisterReqEmail(state) => State::handle_db_response(state),
+            Machine::RegisterCheckNameEmailUnique(state) => State::handle_db_response(state),
+            Machine::RegisterRequestPassword(state) => State::handle_db_response(state),
+            Machine::LoginRequestPassword(state) => State::handle_db_response(state),
+            Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
     }
 }

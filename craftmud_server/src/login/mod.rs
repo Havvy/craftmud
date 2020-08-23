@@ -20,7 +20,6 @@ mod machine;
 
 use machine::{
     HandledBy, HandledByAction, Terminal,
-    DynState as _,
 };
 
 use machine::Machine as LoginMachine;
