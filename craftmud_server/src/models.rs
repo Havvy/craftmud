@@ -15,9 +15,9 @@ pub struct Account {
 }
 
 #[derive(Debug)]
-pub struct CheckUnique(Response<u64>);
+pub struct AccountInsert(Response<u64>);
 
-impl CheckUnique {
+impl AccountInsert {
     pub fn try_recv(&self) -> Result<Result<(), UniqueAccountError>, TryRecvError> {
         self.0.try_recv().map(|res| {
             match res {
@@ -40,34 +40,34 @@ impl CheckUnique {
     }
 }
 #[derive(Debug)]
-pub struct AccountInsert(Response<u64>);
+pub struct AccountPasswordInsert(Response<u64>);
 
-impl AccountInsert {
-    fn try_recv(&self) -> Result<Result<(), ()>, TryRecvError> {
+impl AccountPasswordInsert {
+    pub fn try_recv(&self) -> Result<Result<(), ()>, TryRecvError> {
         Ok(match self.0.try_recv()? {
             Ok(_) => Ok(()),
-            Err(_) => Err(())
+            Err(e) => { dbg!(e); Err(()) }
         })
     }
 }
 
 impl Account {
-    pub fn check_unique(database: &Database, acct_name: login::AccountName, email: Option<login::Email>) -> CheckUnique {
+    pub fn insert_account(database: &Database, acct_name: login::AccountName, email: Option<login::Email>) -> AccountInsert {
         let recv = database.execute(
             "INSERT INTO accounts (name, email) VALUES ($1::TEXT, $2::TEXT)",
             vec![Box::new(acct_name.0), Box::new(email.map(|e| e.0))]
         );
 
-        CheckUnique(recv)
+        AccountInsert(recv)
     }
 
-    pub fn insert(database: &Database, acct_name: login::AccountName, password: String) -> AccountInsert {
+    pub fn insert_password(database: &Database, acct_name: login::AccountName, password: String) -> AccountPasswordInsert {
         let recv = database.execute(
-            "WITH id AS (SELECT id FROM accounts where name = $1::TEXT) INSERT INTO passwords ($2::TEXT, id)",
+            "INSERT INTO passwords (password, account) VALUES ($2::TEXT, (SELECT id FROM accounts where name = $1::TEXT))",
             vec![Box::new(acct_name.0), Box::new(password)],
         );
 
-        AccountInsert(recv)
+        AccountPasswordInsert(recv)
     }
 }
 

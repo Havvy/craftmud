@@ -3,7 +3,7 @@
 use super::*;
 use derive_more::From as DeriveFrom;
 
-use crate::models::{Account, CheckUnique, UniqueAccountError};
+use crate::models::{Account, AccountPasswordInsert, AccountInsert, UniqueAccountError};
 
 pub(super) struct HandledBy {
     pub machine: Machine,
@@ -115,7 +115,7 @@ impl State for RegisterRequestEmail {
 
         let acct_name = self.0;
         let email = Email(input);
-        let recv = Account::check_unique(db, acct_name.clone(), Some(email.clone()));
+        let recv = Account::insert_account(db, acct_name.clone(), Some(email.clone()));
 
         HandledBy { machine: RegisterCheckNameEmailUnique(acct_name.clone(), email, recv).into(), action: HandledByAction::InputStateTrans, }
     }
@@ -126,7 +126,7 @@ impl State for RegisterRequestEmail {
 }
 
 #[derive(Debug)]
-pub(super) struct RegisterCheckNameEmailUnique(AccountName, Email, CheckUnique);
+pub(super) struct RegisterCheckNameEmailUnique(AccountName, Email, AccountInsert);
 
 impl State for RegisterCheckNameEmailUnique {
     const WAITING_ON_DB: bool = true;
@@ -181,13 +181,42 @@ impl State for RegisterRequestPassword {
     type Previous = RegisterRequestEmail;
 
     fn handle_input_impl(self, password: String, db: &Database) -> HandledBy {
-        let insert = Account::insert(db, self.0, password);
+        let insert = Account::insert_password(db, self.0, password);
 
-        HandledBy { machine: todo!(), action: HandledByAction::InputStateTrans, }
+        HandledBy { machine: RegisterWaitPasswordInsert(insert).into(), action: HandledByAction::InputStateTrans, }
     }
 
     fn previous(self) -> <Self as State>::Previous {
         RegisterRequestEmail(self.0)
+    }
+}
+
+#[derive(Debug)]
+pub(super) struct RegisterWaitPasswordInsert(AccountPasswordInsert);
+
+impl State for RegisterWaitPasswordInsert {
+    const PREAMBLE: Option<&'static str> = None;
+    const WAITING_ON_DB: bool = true;
+
+    type Previous = Self;
+
+    fn handle_input_impl(self, _input: String, _db: &Database) -> HandledBy {
+        HandledBy { machine: self.into(), action: HandledByAction::DoNothing, }
+    }
+
+    fn handle_db_response(self) -> HandledBy {
+        println!("db");
+        if let Ok(res) = self.0.try_recv() {
+            println!("ok");
+            res.expect("Inserting password into database failed.");
+            HandledBy { machine: JustConnected.into(), action: HandledByAction::InputStateTransWithMessage("Registration successful!".into()) }
+        } else {
+            HandledBy { machine: self.into(), action: HandledByAction::DoNothing, }
+        }
+    }
+
+    fn previous(self) -> Self::Previous {
+        self
     }
 }
 
@@ -230,6 +259,9 @@ pub(super) enum Machine {
     /// User has given account name and email. Now ask for password.
     RegisterRequestPassword(RegisterRequestPassword),
 
+    /// Wait on database 
+    RegisterWaitPasswordInsert(RegisterWaitPasswordInsert),
+
     /// User has requested to log in with the specified account name.
     LoginRequestPassword(LoginRequestPassword),
 
@@ -248,11 +280,12 @@ impl Machine {
         match self {
             Machine::JustConnected(_state) => JustConnected::PREAMBLE,
             Machine::RegisterRequestName(_state) => RegisterRequestName::PREAMBLE,
-            Machine::RegisterReqEmail(state) => RegisterRequestEmail::PREAMBLE,
-            Machine::RegisterCheckNameEmailUnique(state) => RegisterCheckNameEmailUnique::PREAMBLE,
+            Machine::RegisterReqEmail(_state) => RegisterRequestEmail::PREAMBLE,
+            Machine::RegisterCheckNameEmailUnique(_state) => RegisterCheckNameEmailUnique::PREAMBLE,
             Machine::RegisterRequestPassword(state) => RegisterRequestPassword::PREAMBLE,
-            Machine::LoginRequestPassword(state) => LoginRequestPassword::PREAMBLE,
-            Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
+            Machine::RegisterWaitPasswordInsert(_state) => RegisterWaitPasswordInsert::PREAMBLE,
+            Machine::LoginRequestPassword(_state) => LoginRequestPassword::PREAMBLE,
+            Machine::Terminal(_state) => panic!("Methods should not be called on terminal login state!"),
         }
     }
 
@@ -263,6 +296,7 @@ impl Machine {
             Machine::RegisterReqEmail(state) => RegisterRequestEmail::WAITING_ON_DB,
             Machine::RegisterCheckNameEmailUnique(state) => RegisterCheckNameEmailUnique::WAITING_ON_DB,
             Machine::RegisterRequestPassword(state) => RegisterRequestPassword::WAITING_ON_DB,
+            Machine::RegisterWaitPasswordInsert(_state) => RegisterWaitPasswordInsert::WAITING_ON_DB,
             Machine::LoginRequestPassword(state) => LoginRequestPassword::WAITING_ON_DB,
             Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
@@ -275,6 +309,7 @@ impl Machine {
             Machine::RegisterReqEmail(state) => State::handle_input(state, input, db),
             Machine::RegisterCheckNameEmailUnique(state) => State::handle_input(state, input, db),
             Machine::RegisterRequestPassword(state) => State::handle_input(state, input, db),
+            Machine::RegisterWaitPasswordInsert(state) => State::handle_input(state, input, db),
             Machine::LoginRequestPassword(state) => State::handle_input(state, input, db),
             Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
@@ -287,6 +322,7 @@ impl Machine {
             Machine::RegisterReqEmail(state) => State::handle_db_response(state),
             Machine::RegisterCheckNameEmailUnique(state) => State::handle_db_response(state),
             Machine::RegisterRequestPassword(state) => State::handle_db_response(state),
+            Machine::RegisterWaitPasswordInsert(state) => State::handle_db_response(state),
             Machine::LoginRequestPassword(state) => State::handle_db_response(state),
             Machine::Terminal(state) => panic!("Methods should not be called on terminal login state!"),
         }
