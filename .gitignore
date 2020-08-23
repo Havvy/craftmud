@@ -1,0 +1,4 @@
+/target
+**/*.rs.bk
+Cargo.lock
+craftmud_server/src/db_config.rs

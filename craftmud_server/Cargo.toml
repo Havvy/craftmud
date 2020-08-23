@@ -1,0 +1,15 @@
+[package]
+name = "craftmud_server"
+version = "0.1.0"
+authors = ["Havvy (Ryan Scheel) <is.havvy@gmail.com>"]
+edition = "2018"
+default-run = "server"
+
+[dependencies]
+crossbeam-channel = "0.4.0" # MPSC Channels that impl Sync
+derive_more = "0.99.0" # Extra derives for stdlib types
+legion = "0.2.1" # ECS
+futures = "0.3.0" # Async combinators
+telnet_server = { path = "../telnet_server" } # Telnet Server
+tokio = { version = "0.2.0", features = ["full"] } # Async Reactor
+tokio-postgres = "0.5.0" # SQL

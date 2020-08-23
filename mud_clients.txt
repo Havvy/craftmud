@@ -1,0 +1,5 @@
+These clients support all of the protocols in protocols.txt:
+
+AxMud: https://axmud.sourceforge.io/
+Mudlet: https://www.mudlet.org/
+MUSHclient: http://www.gammon.com.au/mushclient/mushclient.htm

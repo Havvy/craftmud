@@ -1,0 +1,7 @@
+Telnet: https://tools.ietf.org/html/rfc854
+Telnet over UTF-8: https://tools.ietf.org/html/rfc5198
+Telnet Window Size Options: https://tools.ietf.org/html/rfc1073
+Telnet End of Record Option: https://tools.ietf.org/html/rfc885
+Telnet Echo Option: https://tools.ietf.org/html/rfc857
+Mud Client Compression Protocol: https://tintin.sourceforge.io/protocols/mccp/
+MUD eXtension Protocol: https://www.zuggsoft.com/zmud/mxp.htm

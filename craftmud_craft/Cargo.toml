@@ -1,0 +1,11 @@
+[package]
+name = "craftmud_craft"
+version = "0.1.0"
+authors = ["Havvy (Ryan Scheel) <ryan.havvy@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.7"
+rand_core = "0.5.0"

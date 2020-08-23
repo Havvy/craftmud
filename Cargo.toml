@@ -1,0 +1,5 @@
+[workspace]
+
+members = [
+    "craftmud_craft", "craftmud_server", "telnet_server"
+]
